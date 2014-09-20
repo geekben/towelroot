@@ -9,6 +9,8 @@
 #include <sys/resource.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <signal.h>
 
 #define FUTEX_WAIT_REQUEUE_PI   11
 #define FUTEX_CMP_REQUEUE_PI    12
@@ -192,7 +194,7 @@ void write_kernel(int signum)
 
         HACKS_fdm = open("/dev/ptmx", O_RDWR);
         unlockpt(HACKS_fdm);
-        slavename = ptsname(HACKS_fdm);
+        slavename = (char *)ptsname(HACKS_fdm);
 
         open(slavename, O_RDWR);
 
@@ -354,7 +356,7 @@ void *make_action(void *arg) {
     pthread_cond_signal(&is_thread_desched);
 
     act.sa_handler = write_kernel;
-    act.sa_mask = 0;
+    sigemptyset(&act.sa_mask);
     act.sa_flags = 0;
     act.sa_restorer = NULL;
     sigaction(12, &act, NULL);
@@ -449,7 +451,7 @@ int make_socket() {
     int ret;
     int sock_buf_size;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, SOL_TCP);
+    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sockfd < 0) {
         printf("socket failed.\n");
         usleep(10);
@@ -744,7 +746,7 @@ void *accept_socket(void *arg) {
     struct sockaddr_in addr = {0};
     int ret;
 
-    sockfd = socket(AF_INET, SOCK_STREAM, SOL_TCP);
+    sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     yes = 1;
     setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(yes));
