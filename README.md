@@ -1,7 +1,7 @@
 towelroot
 =========
 
-Research of CVE-2014-3153 and its famous exploit towelroot on IA
+Research of CVE-2014-3153 and its famous exploit towelroot on IA (x86)
 
 This job has DONE, but I can't leak the code, someone in my company has challenged me :(
 
